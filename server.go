@@ -17,28 +17,34 @@ import (
 
 var myip string
 
+func getIp(w http.ResponseWriter, r *http.Request) (ip string) {
+  if r.Header.Get("x-real-ip") != "" {
+    ip = r.Header.Get("x-real-ip")
+  } else {
+    ip,_,_ = net.SplitHostPort(r.RemoteAddr)
+  }
+
+  return ip;
+}
+
 func ipHandler(w http.ResponseWriter, r *http.Request) {
-    ip, _, err := net.SplitHostPort(r.RemoteAddr)
-    if err == nil {
-        fmt.Fprintf(w, "%s", replaceLocalIP(ip))
-    }
+  ip := getIp(w,r)
+    fmt.Fprintf(w, "%s", replaceLocalIP(ip))
 }
 
 func dnsHandler(w http.ResponseWriter, r *http.Request) {
-    ip, _, err := net.SplitHostPort(r.RemoteAddr)
+    ip := getIp(w,r)
+    names, err := net.LookupAddr(replaceLocalIP(ip));
     if err == nil {
-        names, err := net.LookupAddr(replaceLocalIP(ip));
-        if err == nil {
-            for _,v := range names {
-                //truncate trailing '.' that may be appended.
-                last := len(v)-1
-                out := v;
-                if last >= 0 && v[last] == '.' {
-                    out = v[:last]
-                }
-
-                fmt.Fprintf(w, "%s\n", out)
+        for _,v := range names {
+            //truncate trailing '.' that may be appended.
+            last := len(v)-1
+            out := v;
+            if last >= 0 && v[last] == '.' {
+                out = v[:last]
             }
+
+            fmt.Fprintf(w, "%s\n", out)
         }
     }
 }

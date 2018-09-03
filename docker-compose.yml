@@ -1,0 +1,22 @@
+version: "2"
+
+services:
+  ip:
+    image: eugenmayer/whatsmyip
+    labels:
+      - "traefik.backend=ip"
+      - "traefik.port=8080"
+      - "traefik.frontend.rule=Host:myip.lan"
+      - "traefik.enable=true"
+  lb:
+    restart: always
+    image: traefik
+    # --docker.exposedByDefault=false is used to forbid traefik to auto-register all container exposing ports in the Dockerfile
+    # we only want to register the ones we set the traefik.enabled label on
+    # we use --docker to be able to register by docker label, see rundecknginx
+    command: -c /dev/null --api --docker --entrypoints="Name:http Address::80" --docker.exposedByDefault=false --docker.domain=docker.localhost --logLevel=DEBUG
+    ports:
+      - 80:80
+      - 8080:8080 # thats the traefik admin backend
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
