@@ -7,129 +7,131 @@
 package main
 
 import (
-    "flag"
-    "fmt"
-    "net"
-    "net/http"
-    "log"
-    "strings"
+	"flag"
+	"fmt"
+	"net"
+	"net/http"
+	"log"
+	"strings"
 )
 
 var myip string
 
 func getIp(w http.ResponseWriter, r *http.Request) (ip string) {
-  if r.Header.Get("x-real-ip") != "" {
-    ip = r.Header.Get("x-real-ip")
-  } else {
-    ip,_,_ = net.SplitHostPort(r.RemoteAddr)
-  }
+	if r.Header.Get("X-Forwarded-For") != "" {
+		ip = r.Header.Get("X-Forwarded-For")
+	} else if r.Header.Get("X-Real-Ip") != "" {
+		ip = r.Header.Get("X-Real-Ip")
+	} else {
+		ip, _, _ = net.SplitHostPort(r.RemoteAddr)
+	}
 
-  return ip;
+	return ip;
 }
 
 func ipHandler(w http.ResponseWriter, r *http.Request) {
-  ip := getIp(w,r)
-    fmt.Fprintf(w, "%s", replaceLocalIP(ip))
+	ip := getIp(w, r)
+	fmt.Fprintf(w, "%s", replaceLocalIP(ip))
 }
 
 func dnsHandler(w http.ResponseWriter, r *http.Request) {
-    ip := getIp(w,r)
-    names, err := net.LookupAddr(replaceLocalIP(ip));
-    if err == nil {
-        for _,v := range names {
-            //truncate trailing '.' that may be appended.
-            last := len(v)-1
-            out := v;
-            if last >= 0 && v[last] == '.' {
-                out = v[:last]
-            }
+	ip := getIp(w, r)
+	names, err := net.LookupAddr(replaceLocalIP(ip));
+	if err == nil {
+		for _, v := range names {
+			//truncate trailing '.' that may be appended.
+			last := len(v) - 1
+			out := v;
+			if last >= 0 && v[last] == '.' {
+				out = v[:last]
+			}
 
-            fmt.Fprintf(w, "%s\n", out)
-        }
-    }
+			fmt.Fprintf(w, "%s\n", out)
+		}
+	}
 }
 
 func getIPNet(network string) *net.IPNet {
-    _, subnet, _ := net.ParseCIDR(network)
-    return subnet;
+	_, subnet, _ := net.ParseCIDR(network)
+	return subnet;
 }
 
-var privateCIDRs = []*net.IPNet {
-    getIPNet("10.0.0.0/8"),
-    getIPNet("172.16.0.0/12"),
-    getIPNet("192.168.0.0/16"),
+var privateCIDRs = []*net.IPNet{
+	getIPNet("10.0.0.0/8"),
+	getIPNet("172.16.0.0/12"),
+	getIPNet("192.168.0.0/16"),
 }
 
 //If 'myip' is in a private range, we assume you are using this service to find ip's in that range also.
 //TODO allow _multiple_ private ranges (most companies just use one, typically 10.0.0.0 or 192.168.0.0)
 func AllowPrivateSubnetForMyip() *net.IPNet {
-    var ip= net.ParseIP(myip)
-    for i, ipr := range privateCIDRs {
-      if ipr.Contains(ip) {
-          //remove ipr
-          privateCIDRs = append(privateCIDRs[:i], privateCIDRs[i+1:]...)
-          return ipr
-      }
-    }
-    return nil
+	var ip = net.ParseIP(myip)
+	for i, ipr := range privateCIDRs {
+		if ipr.Contains(ip) {
+			//remove ipr
+			privateCIDRs = append(privateCIDRs[:i], privateCIDRs[i+1:]...)
+			return ipr
+		}
+	}
+	return nil
 }
 
 // isPrivateSubnet - check to see if this ip is in a private subnet
 func isPrivateSubnet(ips string) bool {
-    ip := net.ParseIP(ips)
-    for _, r := range privateCIDRs {
-      if r.Contains(ip) {
-          return true
-      }
-    }
-    return false
+	ip := net.ParseIP(ips)
+	for _, r := range privateCIDRs {
+		if r.Contains(ip) {
+			return true
+		}
+	}
+	return false
 }
 
 //localhost or private networks such as docker.
 func isLocalIP(ip string) bool {
-    return ip == "127.0.0.1" ||
-           ip == "::1" ||
-           isPrivateSubnet(ip)
+	return ip == "127.0.0.1" ||
+		ip == "::1" ||
+		isPrivateSubnet(ip)
 }
 
 func replaceLocalIP(ip string) string {
-    if isLocalIP(ip) {
-        return myip
-    }
-    return ip
+	if isLocalIP(ip) {
+		return myip
+	}
+	return ip
 }
 
 // Get preferred outbound ip of this machine
 func getOutboundIP() string {
-    conn, err := net.Dial("udp", "8.8.8.8:80")
-    if err != nil {
-        log.Fatal(err)
-    }
-    defer conn.Close()
+	conn, err := net.Dial("udp", "8.8.8.8:80")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer conn.Close()
 
-    localAddr := conn.LocalAddr().String()
-    idx := strings.LastIndex(localAddr, ":")
+	localAddr := conn.LocalAddr().String()
+	idx := strings.LastIndex(localAddr, ":")
 
-    return localAddr[0:idx]
+	return localAddr[0:idx]
 }
 
 func main() {
-    flag.Parse()
+	flag.Parse()
 
-    if flag.NArg() < 1 {
-        myip = getOutboundIP()
-        log.Println("Warning: Blindly choosing my IP of " + myip)
-    } else {
-        myip = flag.Arg(0)
-    }
-    log.Println("For IP's in private subnets I will return my IP: " + myip)
+	if flag.NArg() < 1 {
+		myip = getOutboundIP()
+		log.Println("Warning: Blindly choosing my IP of " + myip)
+	} else {
+		myip = flag.Arg(0)
+	}
+	log.Println("For IP's in private subnets I will return my IP: " + myip)
 
-    network := AllowPrivateSubnetForMyip()
-    if network != nil {
-      log.Println(network.String() + " private IPs are the exception and will also be returned.")
-    }
+	network := AllowPrivateSubnetForMyip()
+	if network != nil {
+		log.Println(network.String() + " private IPs are the exception and will also be returned.")
+	}
 
-    http.HandleFunc("/", ipHandler)
-    http.HandleFunc("/dns", dnsHandler)
-    http.ListenAndServe(":8080", nil)
+	http.HandleFunc("/", ipHandler)
+	http.HandleFunc("/dns", dnsHandler)
+	http.ListenAndServe(":8080", nil)
 }
