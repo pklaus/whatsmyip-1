@@ -2,7 +2,7 @@
 
 Server on port 80
 
-    docker run -p 80:80 pklaus/mod:whatsmyip
+    docker run -p 80:80 pklaus/mod:whatsmyip-server
 
 access `http://localhost` and you get your ip.
 
