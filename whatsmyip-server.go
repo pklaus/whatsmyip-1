@@ -133,5 +133,5 @@ func main() {
 
 	http.HandleFunc("/", ipHandler)
 	http.HandleFunc("/dns", dnsHandler)
-	http.ListenAndServe(":8080", nil)
+	http.ListenAndServe(":80", nil)
 }

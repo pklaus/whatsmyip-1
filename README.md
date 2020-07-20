@@ -1,8 +1,8 @@
 # What's my IP?
 
-Server on port 8080
+Server on port 80
 
-docker run -p 80:8080 mdevey/whatsmyip
+    docker run -p 80:80 pklaus/mod:whatsmyip
 
 access `http://localhost` and you get your ip.
 
