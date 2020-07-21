@@ -1,9 +1,9 @@
 # What's my IP?
 
-Server on port 80
+Start the server on port 80 using
 
     docker run -p 80:80 pklaus/mod:whatsmyip-server
 
-access `http://localhost` and you get your ip.
+and access `http://localhost` to get your IP address.
 
 Supports Load-Balancers with `X-Forward-For` / `X-Real-Ip`
